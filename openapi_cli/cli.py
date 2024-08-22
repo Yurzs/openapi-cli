@@ -197,6 +197,7 @@ def as_json(f: F, model: type[AttrsInstance]) -> F:
 
     @click.option("--json-file", type=Path, help="Input JSON file")
     @click.option("--json", "payload", type=str, help="JSON payload")
+    @click.option("--json-edit", type=str, help="Open text editor name.", default=False)
     @functools.wraps(f)
     @click.pass_context
     def wrapper(
@@ -204,16 +205,20 @@ def as_json(f: F, model: type[AttrsInstance]) -> F:
         *args: P.args,
         json_file: Path | None = None,
         payload: str | None = None,
+        json_edit: str | None = False,
         **kwargs: P.kwargs,
     ) -> R:
 
-        if not ctx.args and not json_file and not payload:
+        if not ctx.args and not json_file and not payload and not json_edit:
             click.echo(ctx.get_help())
             return
 
         if json_file is not None:
             with open(json_file, "r") as file:
                 payload = file.read()
+
+        if json_edit:
+            payload = click.edit(payload, editor=json_edit)
 
         if payload is not None:
             try:
@@ -472,9 +477,9 @@ def install_client(
             if module is not None:
                 config.client_module_name = module
             else:
-                config.client_module_name = re.findall(r"\(from (?P<module>.*)==", result)[0].replace(
-                    "-", "_"
-                )
+                config.client_module_name = re.findall(r"\(from (?P<module>.*)==", result)[
+                    0
+                ].replace("-", "_")
 
     try:
         validate_client_module(config)
