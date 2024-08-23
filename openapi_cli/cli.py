@@ -7,6 +7,7 @@ import os
 import pkgutil
 import re
 import sys
+import time
 import typing
 from enum import Enum
 from functools import cached_property
@@ -418,7 +419,7 @@ def configure(
     """
 
     if base_url is not None:
-        config.base_url = base_url
+        config.base_url = HttpUrl(base_url)
 
     config.save()
 
@@ -521,10 +522,12 @@ def install_client(
         validate_client_module(config)
     except UsageError as e:
         if module is None:
-            message = inspect.cleandoc(f"""
+            message = inspect.cleandoc(
+                f"""
                 {"Failed to find the client module name: {e.message}\n" | red}
                 {"If the client package is under different name specify it with --module" | yellow}
-            """)
+            """
+            )
 
             echo(message, BAD)
             return
@@ -674,6 +677,15 @@ def get_shell_info(script_name, shell="autodetect") -> tuple[Path, str, Path, st
     return rc_path, rc_command, script_rc_path, script_rc_command
 
 
+def create_rc_backup(rc_path: Path):
+    """Create a backup of the shell configuration file."""
+
+    backup_path = f"{rc_path}.backup{int(time.time())}"
+    echo("Creating backup file..." | blue, BACKUP)
+    cp[rc_path.expanduser(), backup_path]()
+    echo(f"Shell configuration backed up to {backup_path}" | green, BACKUP)
+
+
 @completions_group.command("enable")
 @click.argument(
     "shell",
@@ -698,6 +710,8 @@ def enable_completions(ctx: Context, shell: str):
     echo(f"Completions script created for `{script_name}` at {script_rc_path}" | green, FILE)
 
     if rc_path is not None and rc_command is not None:
+        create_rc_backup(rc_path.expanduser())
+
         with open(rc_path.expanduser(), "r") as f:
             rc_text = f.read()
 
@@ -730,16 +744,12 @@ def completions_disable(ctx: Context, shell: str):
     )
 
     if script_rc_path.exists():
-        echo("Removing completions script..." | blue, FILE)
-        mv[script_rc_path.expanduser(), f"{script_rc_path.expanduser()}.backup"]()
-        echo(f"Completions file moved to {script_rc_path}.backup" | green, BACKUP)
+        create_rc_backup(script_rc_path.expanduser())
 
     echo("Looking for completions in shell configuration..." | blue, MAGNIFIER)
 
     if rc_path is not None and rc_command is not None:
-        echo("Creating backup file..." | blue, BACKUP)
-        cp[rc_path.expanduser(), f"{rc_path.expanduser()}.backup"]()
-        echo(f"Shell configuration backed up to `{rc_path}.backup`" | blue, OK)
+        create_rc_backup(rc_path.expanduser())
 
         with open(rc_path.expanduser(), "r") as rc_read_file:
             text = ""
