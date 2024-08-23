@@ -1,7 +1,7 @@
 import importlib
 import pkgutil
 
-from plumbum.cmd import mv, mkdir, touch
+from plumbum.cmd import mkdir, mv, touch
 
 from openapi_cli.separator import CLI_SEPARATOR
 
@@ -15,7 +15,7 @@ def create_new_submodule(
 ) -> str:
     """Create a new submodule by renaming it to remove the module name prefix."""
 
-    from openapi_cli.cli import echo, MOVE
+    from openapi_cli.cli import MOVE, echo
 
     new_sub_module_name, new_file_name = sub_module_name.split(separator)
 
@@ -45,7 +45,7 @@ def create_new_submodule(
 def patch_submodule(module_name: str, separator: str = CLI_SEPARATOR):
     """Patch a submodule by renaming it to remove the module name prefix."""
 
-    from openapi_cli.cli import echo, MOVE
+    from openapi_cli.cli import MOVE, echo
 
     module = importlib.import_module(module_name)
     module_last_name = f"{module_name.split(".")[-1]}_"

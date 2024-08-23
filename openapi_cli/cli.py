@@ -25,7 +25,6 @@ from pydantic import BaseModel, Field, HttpUrl
 
 from openapi_cli.patcher import CLI_SEPARATOR, patch_submodule
 
-
 T = TypeVar("T")
 
 CONFIG_FOLDER = Path(".openapi_cli").absolute()
@@ -47,6 +46,7 @@ WRITE = "📝 " | blue
 BULLET = "\u2022 "
 MOVE = "🚚 " | blue
 CLEAN = "🧹 " | blue
+QUESTION = "❓ " | blue
 
 TYPE_MAP = {
     str: click.STRING,
@@ -60,6 +60,12 @@ def echo(text: str, prefix: str = ""):
     """Print text with a prefix."""
 
     click.echo(f"{f"{prefix} " if prefix else ""}{text}")
+
+
+def confirm(text: str, default: bool = False) -> bool:
+    """Confirm a message."""
+
+    return click.confirm(f"{QUESTION} {text}", default=default)
 
 
 class CliConfig(BaseModel):
@@ -466,8 +472,8 @@ def install_client(
 
     elif git is not None:
         if sys.prefix == sys.base_prefix:
-            if not click.confirmation_option(
-                prompt="Install in system Python?" | yellow,
+            if not confirm(
+                "Install in system Python?" | yellow,
                 default=False,
             ):
                 return click.echo("Aborted")
@@ -509,8 +515,6 @@ def install_client(
 
     echo("Client module installed successfully" | green, OK)
     config.save()
-
-    echo(f"If you want to apply patches use `{ctx.parent.parent.info_name}`", INFO)
 
 
 @client_group.command("patch")
@@ -583,12 +587,12 @@ def generate_client(ctx: Context, api_url: str, output: Path):
 
     echo("Removing relative imports...", CLEAN)
     ruff["check", "--select", "TID252", "--unsafe-fixes", "--fix", "--fix-only", output]()
-    echo("Client generated at {output}" | green, OK)
+    echo(f"Client generated at {output}" | green, OK)
 
-    if click.confirm("Do you want to install the client?" | green, default=True):
+    if confirm("Do you want to install the client?" | green, default=True):
         ctx.invoke(install_client, module=output.name)
 
-    if click.confirm("Do you want to apply patches?" | green, default=True):
+    if confirm("Do you want to apply patches?" | green, default=True):
         ctx.invoke(
             patch_client,
         )
