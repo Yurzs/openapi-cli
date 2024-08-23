@@ -821,9 +821,9 @@ files = [
 ]
 
 [extras]
-full = ["click-didyoumean", "httpx", "openapi-python-client", "plumbum", "ruff"]
+full = ["click-didyoumean", "httpx", "openapi-python-client", "plumbum", "pydantic", "ruff"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<4"
-content-hash = "4c00ae1dd1a156ee615f9ab37fab84fbf1ba2771998e15104949890fbc9c3515"
+content-hash = "c429f2a9b18b3f65f4eba9877e15d1a80c5ff410951c73051f86c4b18069c26c"
