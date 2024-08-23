@@ -19,6 +19,7 @@ from typing import Any, ParamSpec, Self, TypeVar
 import click
 from click import Argument, Context, Group, UsageError, pass_context
 from click_didyoumean import DYMGroup
+from httpx import UnsupportedProtocol
 from plumbum import ProcessExecutionError
 from plumbum.cmd import cp, echo, grep, head, mv, rm, ruff
 from plumbum.colors import blue, green, red, white, yellow
@@ -67,6 +68,15 @@ def confirm(text: str, default: bool = False) -> bool:
     """Confirm a message."""
 
     return click.confirm(f"{QUESTION} {text}", default=default)
+
+
+def get_script_name(ctx: Context) -> str:
+    """Get the script name from the context."""
+
+    while ctx.parent is not None:
+        ctx = ctx.parent
+
+    return ctx.info_name
 
 
 class CliConfig(BaseModel):
@@ -194,7 +204,7 @@ def print_result(f: F) -> F:
 
         result = json.dumps(result, indent=2, cls=config.json_encoder)
 
-        click.echo(result)
+        echo(result)
 
     return wrapper
 
@@ -203,15 +213,20 @@ def with_client(f, client_cls):
     """Initialize the API client."""
 
     @functools.wraps(f)
-    def wrapper(_: Context, *args, **kwargs):
+    def wrapper(ctx: Context, *args, **kwargs):
+        script_name = get_script_name(ctx)
+        error_msg = f"Use `{script_name} client api-config` to set the client base URL" | red
         try:
             return f(
                 *args,
                 **kwargs,
                 client=get_api_client(client_cls),
             )
+        except UnsupportedProtocol as e:
+            echo(f"Got an error while connecting to the API: \n{e}" | red)
+            raise click.UsageError(error_msg)
         except TypeError as e:
-            raise click.UsageError(f"Use `configure` to set the client url and token: {e}")
+            raise click.UsageError(error_msg) from e
 
     return wrapper
 
@@ -234,7 +249,7 @@ def as_json(f: F) -> F:
     ) -> R:
 
         if not ctx.args and not json_file and not payload and not edit:
-            click.echo(ctx.get_help())
+            echo(ctx.get_help())
             return
 
         if json_file is not None:
@@ -407,7 +422,7 @@ def configure(
 
     config.save()
 
-    click.echo("Client module configured successfully")
+    echo("Client module configured successfully" | green, OK)
 
 
 @client_group.command(
@@ -479,7 +494,7 @@ def install_client(
                 "Install in system Python?" | yellow,
                 default=False,
             ):
-                return click.echo("Aborted")
+                return echo("Aborted" | yellow, WARN)
 
         install_cmd = install_cmd[f"git+{git}"]
     else:
@@ -489,7 +504,7 @@ def install_client(
         try:
             result = install_cmd()
         except ProcessExecutionError as e:
-            click.echo(e, color=True)
+            echo(str(e) | red, BAD)
             return
         else:
             result = (grep["(from"] << result)()
@@ -506,12 +521,12 @@ def install_client(
         validate_client_module(config)
     except UsageError as e:
         if module is None:
-            message = f"""
+            message = inspect.cleandoc(f"""
                 {"Failed to find the client module name: {e.message}\n" | red}
                 {"If the client package is under different name specify it with --module" | yellow}
-            """
+            """)
 
-            click.echo(message, color=True)
+            echo(message, BAD)
             return
         else:
             raise e
@@ -600,6 +615,12 @@ def generate_client(ctx: Context, api_url: str, output: Path):
             patch_client,
         )
 
+    if confirm("Do you want to save this url as api base?" | green, default=True):
+        ctx.invoke(configure, base_url=api_url.replace("/openapi.json", ""))
+
+    if confirm("Do you want to enable completions?" | green, default=True):
+        ctx.invoke(enable_completions, shell="autodetect")
+
 
 @cli.group("completions", cls=DYMGroup)
 def completions_group():
@@ -611,6 +632,7 @@ def get_shell_info(script_name, shell="autodetect") -> tuple[Path, str, Path, st
 
     supported_shells = ["bash", "zsh", "fish"]
 
+    real_script_name = script_name
     script_name = script_name.replace("-", "_")
     command_name = script_name.upper()
 
@@ -628,20 +650,22 @@ def get_shell_info(script_name, shell="autodetect") -> tuple[Path, str, Path, st
 
     if shell == "bash":
         rc_path = Path("~/.bashrc")
-        script_rc_command = f'eval "$(_{command_name}_COMPLETE=zsh_source {script_name})"'
+        script_rc_command = f'eval "$(_{command_name}_COMPLETE=zsh_source {real_script_name})"'
     elif shell == "zsh":
         rc_path = Path("~/.zshrc")
-        script_rc_command = f'eval "$(_{command_name}_COMPLETE=zsh_source {script_name})"'
+        script_rc_command = f'eval "$(_{command_name}_COMPLETE=zsh_source {real_script_name})"'
     elif shell == "fish":
         script_rc_path = Path(f"~/.config/fish/completions/{script_name}.fish")
-        script_rc_command = f"_{command_name}_COMPLETE=fish_source {script_name} | source"
+        script_rc_command = f"_{command_name}_COMPLETE=fish_source {real_script_name} | source"
     else:
         raise click.UsageError(f"Unsupported shell {shell}" | red)
 
-    script_rc_command = f"""
-        # {script_name} completion
-        if command -v {script_name} &>/dev/null; then {script_rc_command}; fi
-    """
+    script_rc_command = inspect.cleandoc(
+        f"""
+        # {real_script_name} completion
+        if command -v {real_script_name} &>/dev/null; then {script_rc_command}; fi
+        """
+    )
 
     if shell in ["bash", "zsh"]:
         script_rc_path = Path(f"{rc_path}_{script_name}_completions")
@@ -660,7 +684,7 @@ def get_shell_info(script_name, shell="autodetect") -> tuple[Path, str, Path, st
 def enable_completions(ctx: Context, shell: str):
     """Generate bash completions for the CLI."""
 
-    script_name = ctx.parent.parent.info_name
+    script_name = get_script_name(ctx)
 
     rc_path, rc_command, script_rc_path, script_rc_command = get_shell_info(
         script_name, shell=shell
