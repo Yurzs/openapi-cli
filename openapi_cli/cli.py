@@ -540,7 +540,9 @@ def generate_client(ctx: Context, api_url: str, output: Path):
     OUTPUT: Output folder name. Default: "{your-cli}_client".
     """
 
-    output = Path(str(output).format(your_cli=ctx.parent.parent.info_name))
+    output = Path(
+        str(output).format(your_cli=ctx.parent.parent.info_name.lower()).replace("-", "_")
+    )
 
     try:
         from plumbum.cmd import openapi_python_client
