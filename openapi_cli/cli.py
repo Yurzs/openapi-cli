@@ -18,6 +18,7 @@ from types import ModuleType
 from typing import Any, ParamSpec, Self, TypeVar
 
 import click
+from importlib.metadata import version as get_version
 from click import Argument, Context, Group, UsageError, pass_context
 from click_didyoumean import DYMGroup
 from httpx import UnsupportedProtocol
@@ -129,8 +130,15 @@ class CliConfig(BaseModel):
 
 
 @click.group(cls=DYMGroup, no_args_is_help=True, invoke_without_command=True)
+@click.option("--version", is_flag=True, help="Show openapi-cli version")
 @pass_context
-def cli(ctx: Context):
+def cli(ctx: Context, version: bool = False):
+    """OpenAPI CLI tool."""
+
+    if version:
+        echo(f"openapi-cli: {get_version("openapi-cli")}")
+        return
+
     ctx.obj = CliConfig.load()
 
     module_err = f"Use `{ctx.info_name} client install` to set the client module first!" | red
