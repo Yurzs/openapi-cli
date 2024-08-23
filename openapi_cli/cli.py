@@ -582,7 +582,7 @@ def generate_client(ctx: Context, api_url: str, output: Path):
     rm["-rf", tmp_client_path]()
 
     echo("Removing relative imports...", CLEAN)
-    ruff["check", "--select", "TID252", "--unsafe-fixes", "--fix" "--fix-only", output]()
+    ruff["check", "--select", "TID252", "--unsafe-fixes", "--fix", "--fix-only", output]()
     echo("Client generated at {output}" | green, OK)
 
     if click.confirm("Do you want to install the client?" | green, default=True):
