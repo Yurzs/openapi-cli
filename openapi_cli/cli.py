@@ -748,7 +748,13 @@ def main():
 # Add API actions to the CLI completions
 __conf = CliConfig.load()
 if __conf.client_module_name is not None:
-    iter_api(__conf, f"{__conf.client_module_name}.api", action_group)
+    try:
+        importlib.import_module(f"{__conf.client_module_name}.api")
+    except ModuleNotFoundError:
+        pass
+    else:
+        iter_api(__conf, f"{__conf.client_module_name}.api", action_group)
+
 
 if __name__ == "__main__":
     cli()

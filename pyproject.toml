@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "openapi-cli"
-version = "0.1.15"
+version = "0.1.15.1"
 description = "Use OpenAPI schema to generate command line client"
 authors = ["Yury Sokov (Yurzs) <me@yurzs.dev>"]
 readme = "README.md"
