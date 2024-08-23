@@ -15,6 +15,7 @@ openapi-python-client = {"version" = ">=0.21,<1", optional = true}
 plumbum = {"version" = "^1.8.3", optional = true}
 httpx = {"version" = ">=0.27, <1", optional = true}
 ruff = {"version" = "^0.6.2", optional = true}
+click-didyoumean = {version = "^0.3.1", optional = true}
 
 [tool.poetry.extras]
 full = [
@@ -22,6 +23,7 @@ full = [
     "plumbum",
     "openapi-python-client",
     "httpx",
+    "click-didyoumean",
 ]
 
 [tool.poetry.group.dev.dependencies]

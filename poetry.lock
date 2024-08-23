@@ -134,6 +134,20 @@ files = [
 colorama = {version = "*", markers = "platform_system == \"Windows\""}
 
 [[package]]
+name = "click-didyoumean"
+version = "0.3.1"
+description = "Enables git-like *did-you-mean* feature in click"
+optional = true
+python-versions = ">=3.6.2"
+files = [
+    {file = "click_didyoumean-0.3.1-py3-none-any.whl", hash = "sha256:5c4bb6007cfea5f2fd6583a2fb6701a22a41eb98957e63d0fac41c10e7c3117c"},
+    {file = "click_didyoumean-0.3.1.tar.gz", hash = "sha256:4f82fdff0dbe64ef8ab2279bd6aa3f6a99c3b28c05aa09cbfc07c9d7fbb5a463"},
+]
+
+[package.dependencies]
+click = ">=7"
+
+[[package]]
 name = "colorama"
 version = "0.4.6"
 description = "Cross-platform colored terminal text."
@@ -807,9 +821,9 @@ files = [
 ]
 
 [extras]
-full = ["httpx", "openapi-python-client", "plumbum", "ruff"]
+full = ["click-didyoumean", "httpx", "openapi-python-client", "plumbum", "ruff"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<4"
-content-hash = "375fccdfe348abcb1883a851f63ab4ff728c7aa5b0a12f08d6c149ce17858a9b"
+content-hash = "4c00ae1dd1a156ee615f9ab37fab84fbf1ba2771998e15104949890fbc9c3515"

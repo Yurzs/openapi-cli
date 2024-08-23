@@ -18,6 +18,7 @@ from typing import Any, ParamSpec, Self, TypeVar
 
 import click
 from click import Argument, Context, Group, UsageError, pass_context
+from click_didyoumean import DYMGroup
 from plumbum import ProcessExecutionError
 from plumbum.cmd import cp, echo, grep, head, mv, rm, ruff
 from plumbum.colors import blue, green, red, white, yellow
@@ -116,7 +117,7 @@ class CliConfig(BaseModel):
         return type("JSONEncoder", (JSONEncoder,), {"default": default})
 
 
-@click.group(no_args_is_help=True, invoke_without_command=True)
+@click.group(cls=DYMGroup, no_args_is_help=True, invoke_without_command=True)
 @pass_context
 def cli(ctx: Context):
     ctx.obj = CliConfig.load()
@@ -127,7 +128,7 @@ def cli(ctx: Context):
         raise click.UsageError(module_err)
 
 
-@cli.group("client")
+@cli.group("client", cls=DYMGroup)
 def client_group():
     """Client configuration commands."""
 
@@ -137,6 +138,7 @@ def client_group():
     help="List of API actions",
     invoke_without_command=True,
     no_args_is_help=True,
+    cls=DYMGroup,
 )
 @click.pass_obj
 def action_group(config: CliConfig):
@@ -324,6 +326,7 @@ def iter_api(config: CliConfig, module: str, group: Group) -> None:
                     help=f"Actions tagged with `{sub_module_name}` tag",
                     no_args_is_help=True,
                     invoke_without_command=True,
+                    cls=DYMGroup,
                 )(lambda: None),
             )
         else:
@@ -598,7 +601,7 @@ def generate_client(ctx: Context, api_url: str, output: Path):
         )
 
 
-@cli.group("completions")
+@cli.group("completions", cls=DYMGroup)
 def completions_group():
     """Terminal completion commands."""
 
