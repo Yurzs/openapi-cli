@@ -13,7 +13,7 @@ OpenAPI CLI is a command-line interface (CLI) tool designed to interact with API
 To install OpenAPI CLI, use `poetry`:
 
 ```sh
-poetry install openapi-cli
+poetry add openapi-cli
 ```
 
 ## Usage
@@ -23,7 +23,7 @@ To use OpenAPI CLI in your project add the following to your `pyproject.toml`:
 ```toml
 
     [tool.poetry.scripts]
-    openapi-cli = "openapi_cli:cli"
+    your-api-cli = "openapi_cli:cli"
 
 ```
 
@@ -31,7 +31,7 @@ Then, you can run the CLI using in venv activated shell:
 
 ```sh
 
-    openapi-cli --help
+    your-api-cli --help
 
 ```
 
@@ -39,13 +39,33 @@ Then, you can run the CLI using in venv activated shell:
 
 Before using the CLI, you need to configure it with your client module, base URL, and token.
 
+Install the client module using downloaded module using `openapi-python-client`:
 ```sh
-openapi configure --client-module <client_module_name> --base-url <base_url> --token <token>
+your-api-cli client install --module <name_of_your_module> 
+```
+
+Set the base URL and token for the client module:
+
+```sh
+openapi client api-config --base-url <url_of_your_api>
+openapi client auth --token <your_token>
+```
+
+Patch the client to support nesting:
+
+```sh
+openapi client patch --separator <your_operation_id_separator>  # default is '_oaps_'
+```
+
+You can import separator to integrate it with your code:
+
+```python
+from openapi_cli.patcher import CLI_SEPARATOR
 ```
 
 ### Requirements
 
-- Python 3.11+
+- Python 3.12+
 - Poetry
 
 ### Setup

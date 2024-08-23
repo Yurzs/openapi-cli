@@ -1,10 +1,9 @@
 import importlib
 import pkgutil
 
-import click
 from plumbum.cmd import mv, mkdir, touch
 
-CLI_SEPARATOR = "_clisubmodule_"
+CLI_SEPARATOR = "_oacs_"
 
 
 def create_new_submodule(
@@ -12,12 +11,13 @@ def create_new_submodule(
     module,
     sub_module_name: str,
     sub_module,
+    separator: str = CLI_SEPARATOR,
 ) -> str:
     """Create a new submodule by renaming it to remove the module name prefix."""
 
-    new_sub_module_name, new_file_name = sub_module_name.split(
-        CLI_SEPARATOR,
-    )
+    from openapi_cli.cli import echo, MOVE
+
+    new_sub_module_name, new_file_name = sub_module_name.split(separator)
 
     old_path = f"{module.__path__[0]}/{sub_module_name}"
 
@@ -29,7 +29,7 @@ def create_new_submodule(
         f"{new_path}/{new_file_name}.py",
     )
 
-    print(f"Patching {sub_module_name} to {full_name}")
+    echo(f"Patching {sub_module_name} to {full_name}", MOVE)
 
     mkdir["-p", new_path]()
     touch[f"{new_path}/__init__.py"]()
@@ -42,8 +42,10 @@ def create_new_submodule(
     return full_name
 
 
-def patch_submodule(module_name: str):
+def patch_submodule(module_name: str, separator: str = CLI_SEPARATOR):
     """Patch a submodule by renaming it to remove the module name prefix."""
+
+    from openapi_cli.cli import echo, MOVE
 
     module = importlib.import_module(module_name)
     module_last_name = f"{module_name.split(".")[-1]}_"
@@ -66,20 +68,21 @@ def patch_submodule(module_name: str):
                 f"{new_sub_module_name}.py",
             )
 
-            print(f"Patching {sub_module.name} to {module.__name__}.{new_sub_module_name}")
+            echo(f"Moving {sub_module.name} to {module.__name__}.{new_sub_module_name}", MOVE)
 
             mv[
                 inner_module.__file__,
                 new_sub_file_path,
             ]()
 
-            if CLI_SEPARATOR in new_sub_module_name:
+            if separator in new_sub_module_name:
                 new_submodules.add(
                     create_new_submodule(
                         module_name,
                         module,
                         new_sub_module_name,
                         importlib.import_module(f"{module_name}.{new_sub_module_name}"),
+                        separator=separator,
                     )
                 )
 

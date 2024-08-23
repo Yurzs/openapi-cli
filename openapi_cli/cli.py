@@ -19,11 +19,11 @@ from typing import Any, ParamSpec, Self, TypeVar
 import click
 from click import Argument, Context, Group, UsageError, pass_context
 from plumbum import ProcessExecutionError
-from plumbum.cmd import cp, echo, grep, head, mv
+from plumbum.cmd import cp, echo, grep, head, mv, rm, ruff
 from plumbum.colors import blue, green, red, white, yellow
 from pydantic import BaseModel, Field, HttpUrl
 
-from openapi_cli.patcher import patch_submodule
+from openapi_cli.patcher import CLI_SEPARATOR, patch_submodule
 
 
 T = TypeVar("T")
@@ -45,6 +45,8 @@ FILE = "📄 " | blue
 BACKUP = "🗄️ " | blue
 WRITE = "📝 " | blue
 BULLET = "\u2022 "
+MOVE = "🚚 " | blue
+CLEAN = "🧹 " | blue
 
 TYPE_MAP = {
     str: click.STRING,
@@ -63,9 +65,7 @@ def echo(text: str, prefix: str = ""):
 class CliConfig(BaseModel):
     """CLI configuration file model."""
 
-    client_module_name: str | None = Field(
-        None, description="Python module containing the client"
-    )
+    client_module_name: str | None = Field(None, description="Python module containing the client")
     base_url: HttpUrl | None = Field(None, description="Base URL of the API")
     token: str | None = Field(None, description="API token")
     editor: str | None = Field(None, description="Text editor to use for editing JSON")
@@ -514,11 +514,82 @@ def install_client(
 
 
 @client_group.command("patch")
+@click.option("--separator", help="Separator for nested commands")
 @click.pass_obj
-def patch_client(config: CliConfig):
+def patch_client(config: CliConfig, separator: str | None = None):
     """Patch client generated with openapi-python-client to support more nested commands."""
 
-    patch_submodule(config.client_module_name)
+    separator = separator or CLI_SEPARATOR
+
+    patch_submodule(f"{config.client_module_name}.api", separator)
+
+    echo("Client patched successfully" | green, OK)
+
+
+@client_group.command("generate", no_args_is_help=True)
+@click.argument("api-url", type=str)
+@click.argument("output", type=Path, default="{your_cli}_client")
+@click.pass_context
+def generate_client(ctx: Context, api_url: str, output: Path):
+    """Generate a client module from an OpenAPI schema.
+
+    WARNING: This will overwrite the existing client module completely.
+
+    \b
+    API_URL: URL to the OpenAPI schema. Example: "http://localhost:8000/openapi.json",
+    OUTPUT: Output folder name. Default: "{your-cli}_client".
+    """
+
+    output = Path(str(output).format(your_cli=ctx.parent.parent.info_name))
+
+    try:
+        from plumbum.cmd import openapi_python_client
+    except ImportError:
+        try:
+            from plumbum.cmd import poetry
+
+            openapi_python_client = poetry["run", "openapi-python-client"]
+        except ImportError:
+            raise click.UsageError("openapi-python-client is not installed" | red)
+
+    tmp_client_path = Path(f"/tmp/openapi_client_{os.urandom(5).hex()}")
+
+    echo("Generating client..." | blue, WRITE)
+
+    try:
+        openapi_python_client[
+            "generate",
+            "--url",
+            api_url,
+            "--overwrite",
+            "--output-path",
+            tmp_client_path,
+        ]()
+    except Exception as e:
+        raise click.UsageError(f"Failed to generate client: {e}" | red)
+
+    echo("Cleaning up old client..." | blue, CLEAN)
+    rm["-rf", output]()
+    rm["-rf", "/tmp/fast_api_client"]()
+
+    echo("Moving new client..." | blue, MOVE)
+    mv[tmp_client_path / "fast_api_client", f"/tmp/"]()
+    mv["/tmp/fast_api_client", output]()
+
+    echo("Cleaning up tmp files..." | blue, CLEAN)
+    rm["-rf", tmp_client_path]()
+
+    echo("Removing relative imports...", CLEAN)
+    ruff["check", "--select", "TID252", "--unsafe-fixes", "--fix", output]()
+    echo("Client generated at {output}" | green, OK)
+
+    if click.confirm("Do you want to install the client?" | green, default=True):
+        ctx.invoke(install_client, module=output.name)
+
+    if click.confirm("Do you want to apply patches?" | green, default=True):
+        ctx.invoke(
+            patch_client,
+        )
 
 
 @cli.group("completions")
