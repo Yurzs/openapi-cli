@@ -16,14 +16,14 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any, ParamSpec, Self, TypeVar
 
-import attrs
 import click
-from attr import AttrsInstance
 from click import Argument, Context, Group, UsageError, pass_context
 from plumbum import ProcessExecutionError
+from plumbum.cmd import cp, echo, grep, head, mv
+from plumbum.colors import blue, green, red, white, yellow
 from pydantic import BaseModel, Field, HttpUrl
-import plumbum.colors
-from plumbum.cmd import grep, head, echo
+
+from openapi_cli.patcher import patch_submodule
 
 
 T = TypeVar("T")
@@ -35,6 +35,17 @@ F = typing.Callable[..., Any]
 R = TypeVar("R")
 P = ParamSpec("P")
 
+OK = "✅ " | green
+BAD = "❌ " | red
+INFO = "ℹ️ " | blue
+WARN = "⚠️ " | yellow
+
+MAGNIFIER = "🔍 " | blue
+FILE = "📄 " | blue
+BACKUP = "🗄️ " | blue
+WRITE = "📝 " | blue
+BULLET = "\u2022 "
+
 TYPE_MAP = {
     str: click.STRING,
     int: click.INT,
@@ -43,14 +54,21 @@ TYPE_MAP = {
 }
 
 
+def echo(text: str, prefix: str = ""):
+    """Print text with a prefix."""
+
+    click.echo(f"{f"{prefix} " if prefix else ""}{text}")
+
+
 class CliConfig(BaseModel):
     """CLI configuration file model."""
 
-    client_module_name: Path | str | None = Field(
-        None, description="Python module containing the " "client"
+    client_module_name: str | None = Field(
+        None, description="Python module containing the client"
     )
     base_url: HttpUrl | None = Field(None, description="Base URL of the API")
     token: str | None = Field(None, description="API token")
+    editor: str | None = Field(None, description="Text editor to use for editing JSON")
 
     @classmethod
     def load(cls) -> Self:
@@ -97,9 +115,7 @@ class CliConfig(BaseModel):
 def cli(ctx: Context):
     ctx.obj = CliConfig.load()
 
-    module_err = (
-        f"Use `{ctx.info_name} client install` to set the client module first!" | plumbum.colors.red
-    )
+    module_err = f"Use `{ctx.info_name} client install` to set the client module first!" | red
 
     if ctx.obj.client_module_name is None and ctx.invoked_subcommand != "client":
         raise click.UsageError(module_err)
@@ -107,7 +123,7 @@ def cli(ctx: Context):
 
 @cli.group("client")
 def client_group():
-    pass
+    """Client configuration commands."""
 
 
 @cli.group(
@@ -192,12 +208,12 @@ def with_client(f, client_cls):
     return wrapper
 
 
-def as_json(f: F, model: type[AttrsInstance]) -> F:
+def as_json(f: F) -> F:
     """Parse body as json."""
 
     @click.option("--json-file", type=Path, help="Input JSON file")
     @click.option("--json", "payload", type=str, help="JSON payload")
-    @click.option("--json-edit", type=str, help="Open text editor name.", default=False)
+    @click.option("--edit", is_flag=True, help="Open text in editor")
     @functools.wraps(f)
     @click.pass_context
     def wrapper(
@@ -205,11 +221,11 @@ def as_json(f: F, model: type[AttrsInstance]) -> F:
         *args: P.args,
         json_file: Path | None = None,
         payload: str | None = None,
-        json_edit: str | None = False,
+        edit: bool = False,
         **kwargs: P.kwargs,
     ) -> R:
 
-        if not ctx.args and not json_file and not payload and not json_edit:
+        if not ctx.args and not json_file and not payload and not edit:
             click.echo(ctx.get_help())
             return
 
@@ -217,18 +233,31 @@ def as_json(f: F, model: type[AttrsInstance]) -> F:
             with open(json_file, "r") as file:
                 payload = file.read()
 
-        if json_edit:
-            payload = click.edit(payload, editor=json_edit)
+        if edit:
+            payload = click.edit(payload, editor=ctx.obj.editor)
 
         if payload is not None:
             try:
-                kwargs["body"] = model.from_dict(json.loads(payload))
+                kwargs["body"] = json.loads(payload)
             except JSONDecodeError as e:
-                raise click.UsageError(f"Invalid JSON payload: {e}")
-            except KeyError as e:
-                raise click.UsageError(f"Missing required key: {e}")
+                raise click.UsageError(f"Invalid JSON payload: {e}" | red)
+        else:
+            raise click.UsageError("JSON payload required" | red)
 
         return f(*args, **kwargs)
+
+    w = WARN
+    b = BULLET | yellow
+
+    wrapper.__doc__ += "\b\n"
+    wrapper.__doc__ += inspect.cleandoc(
+        f"""
+        {w} {"JSON payload required" | green} {w}
+        {b} {"to pass a JSON payload use --json flag." | blue}
+        {b} {"to pass a JSON file use --json-file flag." | blue}
+        {b} {"to edit a JSON payload in a text editor use --edit flag." | blue}
+    """
+    )
 
     return wrapper
 
@@ -255,21 +284,15 @@ def add_to_click(config: CliConfig, func: T, value, name) -> T:
 
     value_default = value.default
 
-    if isinstance(value.annotation, type) and attrs.has(value.annotation):
-        value_type = "JSON (call `--show-schema` for more info)"
-        schema = getattr(config.client_models, value.annotation.__name__).model_json_schema()
-        value_default = None
-        func = as_json(func, schema)
-
     if value_default == inspect.Parameter.empty and not is_list:
-        func.__doc__ += f"\b{name}: {value_type}"
+        func.__doc__ += f"{name}: {value_type}\n" | green
         func = click.argument(name)(func)
     else:
         func = click.option(
             f"--{name}",
             default=default_value,
             multiple=is_list,
-            help=f"{name}",
+            help=f"{name}" | blue,
             type=(
                 click.Choice([e.value for e in value.annotation])
                 if isinstance(value.annotation, Enum)
@@ -302,7 +325,9 @@ def iter_api(config: CliConfig, module: str, group: Group) -> None:
 
             func = getattr(importlib.import_module(full_name), "sync_detailed")
 
-            func.__doc__ = func.__doc__.split("\n")[0] + "\n\n"
+            func.__doc__ = inspect.cleandoc(func.__doc__.split("Args:")[0])
+            func.__doc__ = f"{func.__doc__}"
+            func.__doc__ += "\n\nArguments:\n\n\b\n"
 
             if inspect.signature(func).parameters.get("client"):
                 client_cls = inspect.signature(func).parameters.get("client").annotation
@@ -312,9 +337,8 @@ def iter_api(config: CliConfig, module: str, group: Group) -> None:
                 if name == "client":
                     continue
 
-                elif name == "body" and attrs.has(value.annotation):
-                    model = getattr(config.client_models, value.annotation.__name__)
-                    func = as_json(func, model)
+                elif name == "body":
+                    func = as_json(func)
 
                 else:
                     func = add_to_click(config, func, value, name)
@@ -351,37 +375,23 @@ def validate_client_module(config: CliConfig) -> bool:
         try:
             importlib.import_module(f"{config.client_module_name}.{submodule}")
         except (AttributeError, ModuleNotFoundError) as e:
-            raise click.UsageError(str(e) | plumbum.colors.red) from None
+            raise click.UsageError(str(e) | red) from None
 
     return True
 
 
-@client_group.command("configure", no_args_is_help=True)
-@click.option(
-    "--client-module",
-    help="Client module name. Example: 'fast_api_client'",
-)
+@client_group.command("api-config", no_args_is_help=True)
 @click.option("--base-url", help="Base API URL")
 @click.pass_obj
 def configure(
     config: CliConfig,
-    client_module: str | None = None,
     base_url: HttpUrl | None = None,
 ) -> None:
-    """Configure the Open API CLI to use a specific client module.
+    """Configure basic OpenAPI Client options.
 
     \b
-    CLIENT_MODULE: generated module by `openapi-python-client`.
+    BASE_URL: Base URL of the API.
     """
-
-    if config.client_module_name is None and client_module is None:
-        raise click.UsageError(
-            f"{config.client_module_name} is not set and no client module was provided"
-        )
-
-    elif client_module is not None:
-        config.client_module = client_module
-        validate_client_module(config)
 
     if base_url is not None:
         config.base_url = base_url
@@ -411,17 +421,17 @@ def auth(config: CliConfig, token: str) -> None:
 
 GIT_URL_HELP = f"""
     \b
-    {"Git URL to the client module" | plumbum.colors.green}
-    {"[add --module if the package is a submodule]" | plumbum.colors.blue}
+    {"Git URL to the client module" | green}
+    {"[add --module if the package is a submodule]" | blue}
 """
 
 
 @client_group.command("install", no_args_is_help=True)
-@click.option("--module", type=str, help="Module name to install" | plumbum.colors.green)
+@click.option("--module", type=str, help="Module name to install" | green)
 @click.option("--git", help=GIT_URL_HELP)
-@click.pass_obj
+@click.pass_context
 def install_client(
-    config: CliConfig,
+    ctx: Context,
     module: str | None,
     git: str | None,
 ):
@@ -433,6 +443,8 @@ def install_client(
     If you provide a git URL, the module will be installed from the git repository.
     If the client module is a submodule, provide the module name with --module.
     """
+
+    config: CliConfig = ctx.obj
 
     try:
         from plumbum.cmd import poetry
@@ -455,14 +467,14 @@ def install_client(
     elif git is not None:
         if sys.prefix == sys.base_prefix:
             if not click.confirmation_option(
-                prompt="Install in system Python?" | plumbum.colors.warn,
+                prompt="Install in system Python?" | yellow,
                 default=False,
             ):
                 return click.echo("Aborted")
 
         install_cmd = install_cmd[f"git+{git}"]
     else:
-        raise click.UsageError("Provide either a module name or git URL" | plumbum.colors.red)
+        raise click.UsageError("Provide either a module name or git URL" | red)
 
     if install_cmd is not None:
         try:
@@ -486,8 +498,8 @@ def install_client(
     except UsageError as e:
         if module is None:
             message = f"""
-                {"Failed to find the client module name: {e.message}\n" | plumbum.colors.red}
-                {"If the client package is under different name specify it with --module" | plumbum.colors.yellow}
+                {"Failed to find the client module name: {e.message}\n" | red}
+                {"If the client package is under different name specify it with --module" | yellow}
             """
 
             click.echo(message, color=True)
@@ -495,13 +507,67 @@ def install_client(
         else:
             raise e
 
-    click.echo("Client module installed successfully" | plumbum.colors.green, color=True)
+    echo("Client module installed successfully" | green, OK)
     config.save()
+
+    echo(f"If you want to apply patches use `{ctx.parent.parent.info_name}`", INFO)
+
+
+@client_group.command("patch")
+@click.pass_obj
+def patch_client(config: CliConfig):
+    """Patch client generated with openapi-python-client to support more nested commands."""
+
+    patch_submodule(config.client_module_name)
 
 
 @cli.group("completions")
 def completions_group():
-    pass
+    """Terminal completion commands."""
+
+
+def get_shell_info(script_name, shell="autodetect") -> tuple[Path, str, Path, str]:
+    """Detect the current shell and source file and completion command."""
+
+    supported_shells = ["bash", "zsh", "fish"]
+
+    script_name = script_name.replace("-", "_")
+    command_name = script_name.upper()
+
+    if shell == "autodetect":
+        echo("Detecting shell..." | blue, MAGNIFIER)
+
+        shell = os.environ.get("SHELL", "").split("/")[-1]
+
+        echo(f"Detected shell: {shell}" | blue, OK if shell in supported_shells else BAD)
+
+    rc_path = None
+    rc_command = None
+    script_rc_path = None
+    script_rc_command = None
+
+    if shell == "bash":
+        rc_path = Path("~/.bashrc")
+        script_rc_command = f'eval "$(_{command_name}_COMPLETE=zsh_source {script_name})"'
+    elif shell == "zsh":
+        rc_path = Path("~/.zshrc")
+        script_rc_command = f'eval "$(_{command_name}_COMPLETE=zsh_source {script_name})"'
+    elif shell == "fish":
+        script_rc_path = Path(f"~/.config/fish/completions/{script_name}.fish")
+        script_rc_command = f"_{command_name}_COMPLETE=fish_source {script_name} | source"
+    else:
+        raise click.UsageError(f"Unsupported shell {shell}" | red)
+
+    script_rc_command = f"""
+        # {script_name} completion
+        if command -v {script_name} &>/dev/null; then {script_rc_command}; fi
+    """
+
+    if shell in ["bash", "zsh"]:
+        script_rc_path = Path(f"{rc_path}_{script_name}_completions")
+        rc_command = f"source {script_rc_path}"
+
+    return rc_path, rc_command, script_rc_path, script_rc_command
 
 
 @completions_group.command("enable")
@@ -514,28 +580,92 @@ def completions_group():
 def enable_completions(ctx: Context, shell: str):
     """Generate bash completions for the CLI."""
 
-    if shell == "autodetect":
-        shell = os.environ.get("SHELL", "").split("/")[-1]
-
     script_name = ctx.parent.parent.info_name
-    command_name = script_name.upper().replace("-", "_")
 
-    if shell == "bash":
-        file_path = "~/.bashrc"
-        command = f'eval "$(_{command_name}_COMPLETE=zsh_source {script_name})"'
-    elif shell == "zsh":
-        file_path = "~/.zshrc"
-        command = f'eval "$(_{command_name}_COMPLETE=zsh_source {script_name})"'
-    elif shell == "fish":
-        file_path = f"~/.config/fish/completions/{script_name}.fish"
-        command = f"_{command_name}_COMPLETE=fish_source {script_name} | source"
-    else:
-        raise click.UsageError(f"Invalid shell {shell}" | plumbum.colors.red)
+    rc_path, rc_command, script_rc_path, script_rc_command = get_shell_info(
+        script_name, shell=shell
+    )
 
-    action = echo[command] >> str(Path(file_path).expanduser())
-    action()
+    echo(f"Creating completions script for `{script_name}`..." | blue, WRITE)
 
-    click.echo(f"Completions enabled for {shell}" | plumbum.colors.green)
+    with open(script_rc_path.expanduser(), "w") as f:
+        f.write(script_rc_command)
+
+    echo(f"Completions script created for `{script_name}` at {script_rc_path}" | green, FILE)
+
+    if rc_path is not None and rc_command is not None:
+        with open(rc_path.expanduser(), "r") as f:
+            rc_text = f.read()
+
+            if rc_command in rc_text:
+                echo(f"Completions already enabled for `{script_name}` in {rc_path}" | yellow, OK)
+            else:
+                with open(rc_path.expanduser(), "a") as f:
+                    f.write(f"\n{rc_command}\n")
+
+                echo(f"Completions enabled for {script_name}" | green, OK)
+
+    help = "To enable competions use `{cmd}`" | blue
+    cmd = f"source {rc_path}" | white
+
+    echo(f"{help.format(cmd=cmd)}", INFO)
+
+
+@completions_group.command("disable")
+@click.argument(
+    "shell",
+    type=click.Choice(["bash", "zsh", "fish", "autodetect"]),
+    default="autodetect",
+)
+@click.pass_context
+def completions_disable(ctx: Context, shell: str):
+    """Disable completions for the CLI."""
+
+    rc_path, rc_command, script_rc_path, script_command = get_shell_info(
+        ctx.parent.parent.info_name, shell=shell
+    )
+
+    if script_rc_path.exists():
+        echo("Removing completions script..." | blue, FILE)
+        mv[script_rc_path.expanduser(), f"{script_rc_path.expanduser()}.backup"]()
+        echo(f"Completions file moved to {script_rc_path}.backup" | green, BACKUP)
+
+    echo("Looking for completions in shell configuration..." | blue, MAGNIFIER)
+
+    if rc_path is not None and rc_command is not None:
+        echo("Creating backup file..." | blue, BACKUP)
+        cp[rc_path.expanduser(), f"{rc_path.expanduser()}.backup"]()
+        echo(f"Shell configuration backed up to `{rc_path}.backup`" | blue, OK)
+
+        with open(rc_path.expanduser(), "r") as rc_read_file:
+            text = ""
+
+            for line in rc_read_file.readlines():
+                if script_command in line:
+                    echo("Found completions command in shell configuration" | green, INFO)
+                else:
+                    text += line
+
+            with open(rc_path.expanduser(), "w") as rc_write_file:
+                rc_write_file.write(text)
+
+    echo("Completions disabled in shell configuration" | green, OK)
+
+
+@cli.command("set-editor", no_args_is_help=True)
+@click.argument("editor", type=str)
+@click.pass_obj
+def set_editor(config: CliConfig, editor: str):
+    """Set the text editor to use for editing JSON.
+
+    \b
+    EDITOR: Text editor to use. Example: vim, nano, code.
+    """
+
+    config.editor = editor
+    config.save()
+
+    echo(f"Editor set to {editor}" | green, OK)
 
 
 def main():
