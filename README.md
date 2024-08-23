@@ -13,8 +13,30 @@ OpenAPI CLI is a command-line interface (CLI) tool designed to interact with API
 To install OpenAPI CLI, use `poetry`:
 
 ```sh
+poetry add openapi-cli[full]
+```
+
+To install the CLI globally, use `pip`:
+
+```sh
+pip install openapi-cli[full]
+```
+
+## Optional
+If you want to just use separator for your operation ids use:
+
+```bash
 poetry add openapi-cli
 ```
+
+This will not have a cli, but you can use the separator in your code.
+If you want to still have ability to generate clients use the following:
+
+```bash
+poetry add openapi-cli[full] --group dev
+```
+
+This will keep your project build clean and will not install the cli in your production environment.
 
 ## Usage
 
@@ -60,7 +82,7 @@ openapi client patch --separator <your_operation_id_separator>  # default is '_o
 You can import separator to integrate it with your code:
 
 ```python
-from openapi_cli.patcher import CLI_SEPARATOR
+from openapi_cli.separator import CLI_SEPARATOR
 ```
 
 ### Requirements

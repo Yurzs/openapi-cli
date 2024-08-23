@@ -3,7 +3,7 @@ import pkgutil
 
 from plumbum.cmd import mv, mkdir, touch
 
-CLI_SEPARATOR = "_oacs_"
+from openapi_cli.separator import CLI_SEPARATOR
 
 
 def create_new_submodule(
