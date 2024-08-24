@@ -109,6 +109,29 @@ jupyter = ["ipython (>=7.8.0)", "tokenize-rt (>=3.2.0)"]
 uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
+name = "cattrs"
+version = "23.2.3"
+description = "Composable complex class support for attrs and dataclasses."
+optional = true
+python-versions = ">=3.8"
+files = [
+    {file = "cattrs-23.2.3-py3-none-any.whl", hash = "sha256:0341994d94971052e9ee70662542699a3162ea1e0c62f7ce1b4a57f563685108"},
+    {file = "cattrs-23.2.3.tar.gz", hash = "sha256:a934090d95abaa9e911dac357e3a8699e0b4b14f8529bcc7d2b1ad9d51672b9f"},
+]
+
+[package.dependencies]
+attrs = ">=23.1.0"
+
+[package.extras]
+bson = ["pymongo (>=4.4.0)"]
+cbor2 = ["cbor2 (>=5.4.6)"]
+msgpack = ["msgpack (>=1.0.5)"]
+orjson = ["orjson (>=3.9.2)"]
+pyyaml = ["pyyaml (>=6.0)"]
+tomlkit = ["tomlkit (>=0.11.8)"]
+ujson = ["ujson (>=5.7.0)"]
+
+[[package]]
 name = "certifi"
 version = "2024.7.4"
 description = "Python package for providing Mozilla's CA Bundle."
@@ -821,9 +844,9 @@ files = [
 ]
 
 [extras]
-full = ["click-didyoumean", "httpx", "openapi-python-client", "plumbum", "pydantic", "ruff"]
+full = ["cattrs", "click-didyoumean", "httpx", "openapi-python-client", "plumbum", "pydantic", "ruff"]
 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.11,<4"
-content-hash = "c429f2a9b18b3f65f4eba9877e15d1a80c5ff410951c73051f86c4b18069c26c"
+content-hash = "2662508f8d5afbd98c3edabca5e73607e4712aca8bcccddd00b2b945c6274399"

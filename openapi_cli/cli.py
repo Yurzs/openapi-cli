@@ -12,13 +12,15 @@ import typing
 from enum import Enum
 from functools import cached_property
 from http import HTTPStatus
+from importlib.metadata import version as get_version
 from json import JSONDecodeError, JSONEncoder
 from pathlib import Path
 from types import ModuleType
 from typing import Any, ParamSpec, Self, TypeVar
 
+import cattrs
 import click
-from importlib.metadata import version as get_version
+from cattrs import ClassValidationError
 from click import Argument, Context, Group, UsageError, pass_context
 from click_didyoumean import DYMGroup
 from httpx import UnsupportedProtocol
@@ -27,7 +29,7 @@ from plumbum.cmd import cp, echo, grep, head, mv, rm, ruff
 from plumbum.colors import blue, green, red, white, yellow
 from pydantic import BaseModel, Field, HttpUrl
 
-from openapi_cli.patcher import CLI_SEPARATOR, patch_submodule
+from openapi_cli.patcher import CLI_SEPARATOR, patch, patch_submodule
 
 T = TypeVar("T")
 
@@ -79,6 +81,22 @@ def get_script_name(ctx: Context) -> str:
         ctx = ctx.parent
 
     return ctx.info_name
+
+
+def print_validation_errors(exc: ClassValidationError) -> None:
+    """Print validation errors."""
+
+    echo(exc.args[0], MAGNIFIER)
+
+    for error in exc.args[1:]:
+        if isinstance(error, list):
+            for sub_error in error:
+                if isinstance(sub_error, KeyError):
+                    echo(f"Missing required key: {sub_error}" | red, BAD)
+                else:
+                    echo(str(sub_error) | red, BAD)
+        else:
+            echo(str(error) | red, BAD)
 
 
 class CliConfig(BaseModel):
@@ -240,7 +258,7 @@ def with_client(f, client_cls):
     return wrapper
 
 
-def as_json(f: F) -> F:
+def as_json(f: F, body_type: type) -> F:
     """Parse body as json."""
 
     @click.option("--json-file", type=Path, help="Input JSON file")
@@ -270,9 +288,12 @@ def as_json(f: F) -> F:
 
         if payload is not None:
             try:
-                kwargs["body"] = json.loads(payload)
+                kwargs["body"] = cattrs.structure(json.loads(payload), body_type)
             except JSONDecodeError as e:
                 raise click.UsageError(f"Invalid JSON payload: {e}" | red)
+            except cattrs.errors.ClassValidationError as e:
+                print_validation_errors(e)
+                sys.exit(1)
         else:
             raise click.UsageError("JSON payload required" | red)
 
@@ -339,50 +360,53 @@ def iter_api(config: CliConfig, module: str, group: Group) -> None:
     """Iterate over all API classes in a module."""
 
     module = importlib.import_module(module)
-    for sub_module in pkgutil.iter_modules(module.__path__):
-        sub_module_name = sub_module.name.replace("_", "-")
-        if sub_module.ispkg:
-            iter_api(
-                config,
-                f"{module.__name__}.{sub_module.name}",
-                group.group(
-                    sub_module_name,
-                    help=f"Actions tagged with `{sub_module_name}` tag",
-                    no_args_is_help=True,
-                    invoke_without_command=True,
-                    cls=DYMGroup,
-                )(lambda: None),
-            )
-        else:
-            full_name = f"{module.__name__}.{sub_module.name}"
+    with patch(typing, "TYPE_CHECKING", True):
+        for sub_module in pkgutil.iter_modules(module.__path__):
+            sub_module_name = sub_module.name.replace("_", "-")
+            if sub_module.ispkg:
+                iter_api(
+                    config,
+                    f"{module.__name__}.{sub_module.name}",
+                    group.group(
+                        sub_module_name,
+                        help=f"Actions tagged with `{sub_module_name}` tag",
+                        no_args_is_help=True,
+                        invoke_without_command=True,
+                        cls=DYMGroup,
+                    )(lambda: None),
+                )
+            else:
+                full_name = f"{module.__name__}.{sub_module.name}"
 
-            func = getattr(importlib.import_module(full_name), "sync_detailed")
+                func = getattr(importlib.import_module(full_name), "sync_detailed")
 
-            func.__doc__ = inspect.cleandoc(func.__doc__.split("Args:")[0])
-            func.__doc__ = f"{func.__doc__}"
-            func.__doc__ += "\n\nArguments:\n\n\b\n"
+                func.__doc__ = inspect.cleandoc(func.__doc__.split("Args:")[0])
+                func.__doc__ = f"{func.__doc__}"
+                func.__doc__ += "\n\nArguments:\n\n\b\n"
 
-            if inspect.signature(func).parameters.get("client"):
-                client_cls = inspect.signature(func).parameters.get("client").annotation
-                func = with_client(func, client_cls)
+                if inspect.signature(func).parameters.get("client"):
+                    client_cls = inspect.signature(func).parameters.get("client").annotation
+                    func = with_client(func, client_cls)
 
-            for name, value in inspect.signature(func).parameters.items():
-                if name == "client":
-                    continue
+                for name, value in inspect.signature(func).parameters.items():
+                    if name == "client":
+                        continue
 
-                elif name == "body":
-                    func = as_json(func)
+                    elif name == "body":
+                        func = as_json(func, value.annotation)
 
-                else:
-                    func = add_to_click(config, func, value, name)
+                    else:
+                        func = add_to_click(config, func, value, name)
 
-            args_required = False
-            if hasattr(func, "__click_params__"):
-                args_required = bool([o for o in func.__click_params__ if isinstance(o, Argument)])
+                args_required = False
+                if hasattr(func, "__click_params__"):
+                    args_required = bool(
+                        [o for o in func.__click_params__ if isinstance(o, Argument)]
+                    )
 
-            cmd = group.command(sub_module_name, no_args_is_help=args_required)
+                cmd = group.command(sub_module_name, no_args_is_help=args_required)
 
-            cmd(click.pass_context(print_result(func)))
+                cmd(click.pass_context(print_result(func)))
 
 
 @click.pass_obj
