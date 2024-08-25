@@ -1,10 +1,13 @@
+"""Module with patching utilities to make generated client api support more nesting."""
+
 import importlib
 import pkgutil
-from contextlib import contextmanager
 
 from plumbum.cmd import mkdir, mv, touch
 
 from openapi_cli.separator import CLI_SEPARATOR
+from openapi_cli.symbols import MOVE
+from openapi_cli.utils import echo
 
 
 def create_new_submodule(
@@ -15,8 +18,6 @@ def create_new_submodule(
     separator: str = CLI_SEPARATOR,
 ) -> str:
     """Create a new submodule by renaming it to remove the module name prefix."""
-
-    from openapi_cli.cli import MOVE, echo
 
     new_sub_module_name, new_file_name = sub_module_name.split(separator)
 
@@ -45,8 +46,6 @@ def create_new_submodule(
 
 def patch_submodule(module_name: str, separator: str = CLI_SEPARATOR):
     """Patch a submodule by renaming it to remove the module name prefix."""
-
-    from openapi_cli.cli import MOVE, echo
 
     module = importlib.import_module(module_name)
     module_last_name = f"{module_name.split(".")[-1]}_"
@@ -89,15 +88,3 @@ def patch_submodule(module_name: str, separator: str = CLI_SEPARATOR):
 
     for new_submodule in new_submodules:
         patch_submodule(new_submodule)
-
-
-@contextmanager
-def patch(object_, attribute_name, value):
-    """Patch an object attribute with a new value."""
-
-    old_value = getattr(object_, attribute_name)
-    try:
-        setattr(object_, attribute_name, value)
-        yield
-    finally:
-        setattr(object_, attribute_name, old_value)

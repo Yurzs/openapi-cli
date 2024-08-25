@@ -396,13 +396,13 @@ files = [
 
 [[package]]
 name = "openapi-python-client"
-version = "0.21.3"
+version = "0.21.4"
 description = "Generate modern Python clients from OpenAPI"
 optional = true
 python-versions = "<4.0,>=3.8.1"
 files = [
-    {file = "openapi_python_client-0.21.3-py3-none-any.whl", hash = "sha256:89ef8d07c2990a665bcfbcf2377e07065ff89e3819d6bca4dbd9294476080402"},
-    {file = "openapi_python_client-0.21.3.tar.gz", hash = "sha256:78d217fd59e5d91f3d9f556fcb4ea3cb43d66548a0aed3e90a566e84532b56f2"},
+    {file = "openapi_python_client-0.21.4-py3-none-any.whl", hash = "sha256:3de5de93639462ccc56d62b367db5088763864fca833b0ca3b1055c632cdd195"},
+    {file = "openapi_python_client-0.21.4.tar.gz", hash = "sha256:5c21ed6e36f2b9aa83bce0d5c3ea7bc0d1744cefa0642bd40e3646bde2a6a952"},
 ]
 
 [package.dependencies]
@@ -817,13 +817,13 @@ files = [
 
 [[package]]
 name = "typer"
-version = "0.12.4"
+version = "0.12.5"
 description = "Typer, build great CLIs. Easy to code. Based on Python type hints."
 optional = true
 python-versions = ">=3.7"
 files = [
-    {file = "typer-0.12.4-py3-none-any.whl", hash = "sha256:819aa03699f438397e876aa12b0d63766864ecba1b579092cc9fe35d886e34b6"},
-    {file = "typer-0.12.4.tar.gz", hash = "sha256:c9c1613ed6a166162705b3347b8d10b661ccc5d95692654d0fb628118f2c34e6"},
+    {file = "typer-0.12.5-py3-none-any.whl", hash = "sha256:62fe4e471711b147e3365034133904df3e235698399bc4de2b36c8579298d52b"},
+    {file = "typer-0.12.5.tar.gz", hash = "sha256:f592f089bedcc8ec1b974125d64851029c3b1af145f04aca64d69410f0c9b722"},
 ]
 
 [package.dependencies]
