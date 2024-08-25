@@ -230,13 +230,34 @@ def generate_client(ctx: Context, api_url: str, output: Path):
     except Exception as e:
         raise click.UsageError(f"Failed to generate client: {e}" | red)
 
+    folder_signature = {
+        "client.py",
+        "__init__.py",
+        "types.py",
+        "models",
+        "py.typed",
+        "api",
+        "errors.py",
+    }
+
+    inner_client_path = None
+
+    # Find client folder name
+    for fs_entity in tmp_client_path.iterdir():
+        if fs_entity.is_dir():
+            if not folder_signature.difference([f.name for f in fs_entity.iterdir()]):
+                inner_client_path = fs_entity
+                break
+    else:
+        raise click.UsageError("Unable to find python module.")
+
     echo("Cleaning up old client..." | blue, CLEAN)
     rm["-rf", output]()
-    rm["-rf", "/tmp/fast_api_client"]()
+    rm["-rf", f"/tmp/{inner_client_path.name}"]()
 
     echo("Moving new client..." | blue, MOVE)
-    mv[tmp_client_path / "fast_api_client", f"/tmp/"]()
-    mv["/tmp/fast_api_client", output]()
+    mv[inner_client_path, f"/tmp/"]()
+    mv[f"/tmp/{inner_client_path.name}", output]()
 
     echo("Cleaning up tmp files..." | blue, CLEAN)
     rm["-rf", tmp_client_path]()

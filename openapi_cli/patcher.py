@@ -68,7 +68,8 @@ def patch_submodule(module_name: str, separator: str = CLI_SEPARATOR):
                 f"{new_sub_module_name}.py",
             )
 
-            echo(f"Moving {sub_module.name} to {module.__name__}.{new_sub_module_name}", MOVE)
+            if sub_module.name != new_sub_module_name:
+                echo(f"Moving {sub_module.name} to {new_sub_module_name}", MOVE)
 
             mv[
                 inner_module.__file__,

@@ -277,6 +277,9 @@ def setup_actions(config: CliConfig, module, group: Group) -> None:
 def get_api_client(config: CliConfig, client_cls: type[T] | tuple[type[T]]) -> T:
     """Get an API client instance."""
 
+    if typing.get_origin(client_cls) is typing.Union:
+        client_cls = typing.get_args(client_cls)[0]
+
     if isinstance(client_cls, tuple):
         client_cls = client_cls[0]
 
