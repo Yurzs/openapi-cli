@@ -14,7 +14,7 @@ from plumbum.colors import blue, green, red, yellow  # noqa: F401
 from pydantic import HttpUrl
 
 from openapi_cli.config import CliConfig
-from openapi_cli.helpers import confirm, echo, redirect
+from openapi_cli.helpers import confirm, echo, get_script_name, redirect
 from openapi_cli.interfaces.configure import configure
 from openapi_cli.interfaces.main import cli
 from openapi_cli.patcher import patch_submodule
@@ -198,11 +198,11 @@ def generate_client(ctx: Context, api_url: str, output: Path):
 
     \b
     API_URL: URL to the OpenAPI schema. Example: "http://localhost:8000/openapi.json",
-    OUTPUT: Output folder name. Default: "{your-cli}_client".
+    OUTPUT: Output folder name. Default: "{your_cli}_client".
     """
 
     output = Path(
-        str(output).format(your_cli=ctx.parent.parent.info_name.lower()).replace("-", "_")
+        str(output).format(your_cli=get_script_name(ctx).replace("-", "_"))
     )
 
     try:

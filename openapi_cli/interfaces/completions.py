@@ -128,7 +128,7 @@ def completions_disable(ctx: Context, shell: str):
     """Disable completions for the CLI."""
 
     rc_path, rc_command, script_rc_path, script_command = get_shell_info(
-        ctx.parent.parent.info_name, shell=shell
+        get_script_name(ctx), shell=shell
     )
 
     if script_rc_path.exists():
