@@ -9,8 +9,15 @@ from plumbum.colors import blue, red  # noqa: F401
 from typing_extensions import ForwardRef
 
 from openapi_cli.config import CliConfig
+from openapi_cli.helpers import (
+    echo,
+    get_script_name,
+    is_command,
+    is_completions,
+    is_main_command,
+    patch,
+)
 from openapi_cli.symbols import ERROR, INFO
-from openapi_cli.helpers import echo, get_script_name, is_command, is_completions, patch
 
 ATTRS_TYPE_MAP = {}
 
@@ -45,7 +52,7 @@ def register_models(module):
                 ATTRS_TYPE_MAP[obj.__name__] = obj
 
 
-if config.client_module_name and (is_completions("action") or is_command("action")):
+if config.client_module_name and (is_completions() or not is_command("configure")):
     try:
         with patch(typing, "TYPE_CHECKING", True):
             types = importlib.import_module(f"{config.client_module_name}.types")
@@ -61,9 +68,10 @@ if config.client_module_name and (is_completions("action") or is_command("action
         register_models(models)
         register_models(api)
     except ModuleNotFoundError:
-        ctx = click.get_current_context(True)
-        script_name = sys.argv[0].split("/")[-1] if ctx is None else get_script_name(ctx)
+        if not is_main_command():
+            ctx = click.get_current_context(True)
+            script_name = sys.argv[0].split("/")[-1] if ctx is None else get_script_name(ctx)
 
-        echo("Client module not found" | red, ERROR)
-        echo(f"Use `{script_name} client` to set up the client module" | blue, INFO)
-        sys.exit(1)
+            echo("Client module not found" | red, ERROR)
+            echo(f"Use `{script_name} configure client` to set up the client module" | blue, INFO)
+            sys.exit(1)

@@ -14,14 +14,15 @@ from plumbum.colors import blue, green, red, yellow  # noqa: F401
 from pydantic import HttpUrl
 
 from openapi_cli.config import CliConfig
+from openapi_cli.helpers import confirm, echo, redirect
+from openapi_cli.interfaces.configure import configure
 from openapi_cli.interfaces.main import cli
 from openapi_cli.patcher import patch_submodule
 from openapi_cli.separator import CLI_SEPARATOR
 from openapi_cli.symbols import BAD, CLEAN, MOVE, OK, WARN, WRITE
-from openapi_cli.helpers import confirm, echo, redirect
 
 
-@cli.group("client", cls=DYMGroup)
+@configure.group("client", cls=DYMGroup)
 def client_group():
     """Client configuration commands."""
 
@@ -298,4 +299,4 @@ def generate_client(ctx: Context, api_url: str, output: Path):
         ctx.invoke(configure, base_url=api_url.replace("/openapi.json", ""))
 
     if confirm("Do you want to enable completions?" | green, default=True):
-        redirect(ctx, cli, "completions.enable", shell="autodetect")
+        redirect(ctx, cli, "configure.completions.enable", shell="autodetect")

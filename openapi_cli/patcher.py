@@ -5,9 +5,9 @@ import pkgutil
 
 from plumbum.cmd import mkdir, mv, touch
 
+from openapi_cli.helpers import echo
 from openapi_cli.separator import CLI_SEPARATOR
 from openapi_cli.symbols import MOVE
-from openapi_cli.helpers import echo
 
 
 def create_new_submodule(

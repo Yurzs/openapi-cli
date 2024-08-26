@@ -21,9 +21,9 @@ from plumbum.colors import blue, green, red, yellow  # noqa: F401
 
 from openapi_cli import _client as client
 from openapi_cli.config import CliConfig
+from openapi_cli.helpers import client_is_installed, echo, get_script_name, print_validation_errors
 from openapi_cli.interfaces.main import cli
 from openapi_cli.symbols import BULLET, WARN
-from openapi_cli.helpers import client_is_installed, echo, get_script_name, print_validation_errors
 
 T = TypeVar("T")
 
@@ -38,17 +38,6 @@ TYPE_MAP = {
     float: click.FLOAT,
     bool: click.BOOL,
 }
-
-
-@cli.group(
-    "action",
-    help="List of API actions",
-    invoke_without_command=True,
-    no_args_is_help=True,
-    cls=DYMGroup,
-)
-def action_group():
-    pass
 
 
 def print_result(f: F) -> F:
@@ -291,4 +280,4 @@ def get_api_client(config: CliConfig, client_cls: type[T] | tuple[type[T]]) -> T
 
 
 if client_is_installed():
-    setup_actions(CliConfig.load(), client.api, action_group)
+    setup_actions(CliConfig.load(), client.api, cli)

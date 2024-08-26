@@ -42,7 +42,6 @@ def print_validation_errors(exc: ClassValidationError) -> None:
     for error in exc.args[1:]:
         if isinstance(error, list):
             for sub_error in error:
-                print(sub_error.args)
                 if isinstance(sub_error, KeyError):
                     echo(f"Missing required key: {sub_error}" | red, BAD)
                 else:
@@ -84,7 +83,7 @@ def redirect(ctx: Context, cli: Command, command_path: str, *args, **kwargs):
     ctx.invoke(command, *args, **kwargs)
 
 
-def is_completions(command: str | None = None):
+def is_completions(command: str | None = ""):
     """Check if the script is running for completions."""
 
     comp_args = os.environ.get("COMP_WORDS")
@@ -102,3 +101,8 @@ def is_command(command: str | None = None):
         return False
 
     return sys.argv[1] == command
+
+def is_main_command():
+    """Check if the script is running as the main command."""
+
+    return len(sys.argv) == 1
