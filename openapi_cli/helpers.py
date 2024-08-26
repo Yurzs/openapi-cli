@@ -1,3 +1,5 @@
+import os
+import sys
 from contextlib import contextmanager
 
 import click
@@ -20,8 +22,11 @@ def confirm(text: str, default: bool = False) -> bool:
     return click.confirm(f"{QUESTION} {text}", default=default)
 
 
-def get_script_name(ctx: Context) -> str:
+def get_script_name(ctx: Context | None = None) -> str:
     """Get the script name from the context."""
+
+    if ctx is None:
+        return sys.argv[0].split("/")[-1]
 
     while ctx.parent is not None:
         ctx = ctx.parent
@@ -77,3 +82,23 @@ def redirect(ctx: Context, cli: Command, command_path: str, *args, **kwargs):
         command = command.commands[path]
 
     ctx.invoke(command, *args, **kwargs)
+
+
+def is_completions(command: str | None = None):
+    """Check if the script is running for completions."""
+
+    comp_args = os.environ.get("COMP_WORDS")
+
+    if comp_args is None:
+        return False
+
+    return command in comp_args
+
+
+def is_command(command: str | None = None):
+    """Check if the script is running for a specific command."""
+
+    if len(sys.argv) < 2:
+        return False
+
+    return sys.argv[1] == command

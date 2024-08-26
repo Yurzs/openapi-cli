@@ -10,7 +10,7 @@ from typing_extensions import ForwardRef
 
 from openapi_cli.config import CliConfig
 from openapi_cli.symbols import ERROR, INFO
-from openapi_cli.utils import echo, get_script_name, patch
+from openapi_cli.helpers import echo, get_script_name, is_command, is_completions, patch
 
 ATTRS_TYPE_MAP = {}
 
@@ -45,7 +45,7 @@ def register_models(module):
                 ATTRS_TYPE_MAP[obj.__name__] = obj
 
 
-if config.client_module_name and len(sys.argv) > 1 and sys.argv[1] == "action":
+if config.client_module_name and (is_completions("action") or is_command("action")):
     try:
         with patch(typing, "TYPE_CHECKING", True):
             types = importlib.import_module(f"{config.client_module_name}.types")

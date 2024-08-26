@@ -6,7 +6,7 @@ from click_didyoumean import DYMGroup
 from plumbum.colors import red  # noqa: F401
 
 from openapi_cli.config import CliConfig
-from openapi_cli.utils import echo
+from openapi_cli.helpers import echo
 
 
 @click.group(cls=DYMGroup, no_args_is_help=True, invoke_without_command=True)

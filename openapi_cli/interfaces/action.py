@@ -23,7 +23,7 @@ from openapi_cli import _client as client
 from openapi_cli.config import CliConfig
 from openapi_cli.interfaces.main import cli
 from openapi_cli.symbols import BULLET, WARN
-from openapi_cli.utils import client_is_installed, echo, get_script_name, print_validation_errors
+from openapi_cli.helpers import client_is_installed, echo, get_script_name, print_validation_errors
 
 T = TypeVar("T")
 

@@ -11,7 +11,7 @@ from plumbum.colors import blue, green, red, white, yellow  # noqa: F401
 
 from openapi_cli.interfaces.main import cli
 from openapi_cli.symbols import BACKUP, BAD, FILE, INFO, MAGNIFIER, OK, WRITE
-from openapi_cli.utils import echo, get_script_name
+from openapi_cli.helpers import echo, get_script_name
 
 
 @cli.group("completions", cls=DYMGroup)

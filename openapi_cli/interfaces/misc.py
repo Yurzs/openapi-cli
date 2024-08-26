@@ -4,7 +4,7 @@ from plumbum.colors import green  # noqa: F401
 from openapi_cli.config import CliConfig
 from openapi_cli.interfaces.main import cli
 from openapi_cli.symbols import OK
-from openapi_cli.utils import echo
+from openapi_cli.helpers import echo
 
 
 @cli.command("set-editor", no_args_is_help=True)

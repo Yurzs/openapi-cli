@@ -18,7 +18,7 @@ from openapi_cli.interfaces.main import cli
 from openapi_cli.patcher import patch_submodule
 from openapi_cli.separator import CLI_SEPARATOR
 from openapi_cli.symbols import BAD, CLEAN, MOVE, OK, WARN, WRITE
-from openapi_cli.utils import confirm, echo, redirect
+from openapi_cli.helpers import confirm, echo, redirect
 
 
 @cli.group("client", cls=DYMGroup)
